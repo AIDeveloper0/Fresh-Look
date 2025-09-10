@@ -10,6 +10,7 @@
 
 import Stripe from "npm:stripe";
 import { createClient } from "npm:@supabase/supabase-js";
+import { corsHeaders } from "../_shared/cors.ts";
 
 type Json = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
 
@@ -27,7 +28,7 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
 function json(body: Json, init?: number | ResponseInit) {
   const payload = typeof body === "string" ? body : JSON.stringify(body);
   return new Response(payload, {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
     ...(typeof init === "number" ? { status: init } : init),
   });
 }
@@ -76,6 +77,10 @@ async function getOrCreateStripeCustomer(user: { id: string; email?: string | nu
 }
 
 Deno.serve(async (req) => {
+  // CORS preflight support
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
   try {
     if (req.method !== "POST") return error("Method not allowed", 405);
 
@@ -109,4 +114,3 @@ Deno.serve(async (req) => {
     return error("Internal Server Error", 500);
   }
 });
-

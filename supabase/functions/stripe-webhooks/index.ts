@@ -8,6 +8,7 @@
 
 import Stripe from "npm:stripe";
 import { createClient } from "npm:@supabase/supabase-js";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
@@ -20,7 +21,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 function json(body: unknown, init?: number | ResponseInit) {
   const payload = typeof body === "string" ? body : JSON.stringify(body);
   return new Response(payload, {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
     ...(typeof init === "number" ? { status: init } : init),
   });
 }
@@ -67,6 +68,10 @@ async function upsertSubscription(params: {
 }
 
 Deno.serve(async (req) => {
+  // CORS preflight support
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -128,4 +133,3 @@ Deno.serve(async (req) => {
     return json({ error: "Webhook handler error" }, 500);
   }
 });
-
