@@ -158,8 +158,8 @@ function App() {
   }
 
   if (currentPage === 'newsletter') {
+    // Allow any signed-in user (Free or Premium) to access Newsletter
     if (!isSignedIn) return <AccessDenied reason="signin" target="Newsletter" />;
-    if (!isPremium) return <AccessDenied reason="upgrade" target="Newsletter" />;
     return <NewsletterPage onNavigate={setCurrentPage} />;
   }
 
