@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Check, Star, Crown, Users, Home, ArrowLeft } from 'lucide-react';
+import { startPremiumCheckout } from '../lib/functionsClient';
 
 interface PricingPageProps {
   onNavigate?: (page: string) => void;
 }
 
 const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const plans = [
     {
       name: "Free",
@@ -133,10 +136,24 @@ const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 </ul>
                 
                 <button
-                  onClick={plan.name === 'Free' ? openFreeQuiz : undefined}
-                  className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors ${plan.buttonStyle}`}
+                  onClick={async () => {
+                    if (plan.name === 'Free') return openFreeQuiz();
+                    // Premium checkout
+                    setError(null);
+                    setLoading(true);
+                    try {
+                      const url = await startPremiumCheckout();
+                      window.location.href = url;
+                    } catch (e: any) {
+                      setError(e?.message || 'Unable to start checkout');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors ${plan.buttonStyle} ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
-                  {plan.buttonText}
+                  {loading && plan.name === 'Premium' ? 'Starting…' : plan.buttonText}
                 </button>
               </div>
             ))}
@@ -208,6 +225,9 @@ const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
           </div>
           
           <div className="text-center mt-12">
+            {error && (
+              <p className="text-sm text-red-600 mb-4">{error}</p>
+            )}
             <p className="text-sm text-gray-500">
               Cancel anytime. No hidden fees. Questions? 
               <a href="#" className="text-amber-600 hover:text-amber-700 ml-1">Contact us</a>
