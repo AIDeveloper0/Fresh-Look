@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, Home, Chrome, ArrowLeft } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface SignInProps {
   onNavigate?: (page: string) => void;
+  onMemberAccess?: (type: 'premium') => void;
 }
 
-const SignIn: React.FC<SignInProps> = ({ onNavigate }) => {
+const SignIn: React.FC<SignInProps> = ({ onNavigate, onMemberAccess }) => {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -19,22 +23,44 @@ const SignIn: React.FC<SignInProps> = ({ onNavigate }) => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission here
-    console.log('Form submitted:', formData);
-    // For demo purposes, navigate to dashboard
-    if (onNavigate) {
-      onNavigate('dashboard');
+    setError(null);
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+      if (error) throw error;
+      // On success, either navigate or trigger member access
+      if (data.session) {
+        onMemberAccess?.('premium');
+        onNavigate?.('dashboard');
+      }
+    } catch (err: any) {
+      setError(err?.message ?? 'Sign in failed');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = () => {
-    // Handle Google sign in here
-    console.log('Google sign in clicked');
-    // For demo purposes, navigate to dashboard
-    if (onNavigate) {
-      onNavigate('dashboard');
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+      // Redirect occurs; nothing else to do here
+    } catch (err: any) {
+      setError(err?.message ?? 'Google sign-in failed');
+    } finally {
+      setLoading(false);
     }
   };
   const handleBackToHome = () => {
@@ -121,11 +147,26 @@ const SignIn: React.FC<SignInProps> = ({ onNavigate }) => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-amber-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-amber-700 transition-colors shadow-lg"
+              disabled={loading}
+              className="w-full bg-amber-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-amber-700 transition-colors shadow-lg disabled:opacity-60"
             >
-              Sign In
+              {loading ? 'Signing In...' : 'Sign In'}
             </button>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('reset-password')}
+                className="mt-2 text-sm text-amber-600 hover:text-amber-700 font-medium"
+              >
+                Forgot your password? Reset it
+              </button>
+            </div>
           </form>
+          {error && (
+            <div className="mt-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
 
           {/* Google Sign In */}
           <div className="mt-6">

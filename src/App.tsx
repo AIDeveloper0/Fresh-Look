@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Mission from './components/Mission';
@@ -17,6 +17,7 @@ import PricingPage from './components/PricingPage';
 import NewsletterPage from './components/NewsletterPage';
 import CompanyPage from './components/CompanyPage';
 import LegalPage from './components/LegalPage';
+import { supabase } from './lib/supabaseClient';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -27,6 +28,65 @@ function App() {
     setMembershipType(type);
     setCurrentPage('dashboard');
   };
+
+  // On mount, check for existing session and react to auth changes
+  useEffect(() => {
+    // Detect password recovery callback in URL
+    const isRecoveryFromUrl = () => {
+      const hash = typeof window !== 'undefined' ? window.location.hash : '';
+      const search = typeof window !== 'undefined' ? window.location.search : '';
+      return (
+        (hash && /type=recovery/.test(hash)) ||
+        (search && /type=recovery/.test(search))
+      );
+    };
+    const recovering = isRecoveryFromUrl();
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (recovering) {
+        setCurrentPage('reset-password');
+        return;
+      }
+      if (data.session) {
+        setMembershipType('premium');
+        setCurrentPage('dashboard');
+      }
+    };
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      // If recovery flow is in progress, always route to reset screen
+      if (event === 'PASSWORD_RECOVERY' || recovering) {
+        setCurrentPage('reset-password');
+        return;
+      }
+      if (session) {
+        setMembershipType('premium');
+        setCurrentPage('dashboard');
+      } else {
+        // Avoid overriding explicit navigation (e.g., reset-password)
+        setCurrentPage(prev => (prev === 'dashboard' ? 'home' : prev));
+      }
+    });
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // When navigating back to home with a hash (e.g., #quiz), scroll smoothly to the section
+  useEffect(() => {
+    if (currentPage === 'home') {
+      const hash = typeof window !== 'undefined' ? window.location.hash : '';
+      if (hash) {
+        const id = hash.replace('#', '');
+        // Allow the home DOM to render first
+        setTimeout(() => {
+          const el = document.getElementById(id);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 0);
+      }
+    }
+  }, [currentPage]);
 
   // Function to handle navigation from dashboard
   const handleDashboardNavigation = (page: string) => {
@@ -50,11 +110,11 @@ function App() {
   }
 
   if (currentPage === 'signin') {
-    return <SignIn onNavigate={setCurrentPage} />;
+    return <SignIn onNavigate={setCurrentPage} onMemberAccess={handleMemberAccess} />;
   }
 
   if (currentPage === 'signup') {
-    return <SignUp onNavigate={setCurrentPage} />;
+    return <SignUp onNavigate={setCurrentPage} onMemberAccess={handleMemberAccess} />;
   }
 
   if (currentPage === 'pricing') {
@@ -67,6 +127,15 @@ function App() {
 
   if (currentPage === 'legal') {
     return <LegalPage onNavigate={setCurrentPage} />;
+  }
+
+  if (currentPage === 'reset-password') {
+    const ResetPassword = React.lazy(() => import('./components/ResetPassword'));
+    return (
+      <React.Suspense fallback={<div className="p-8">Loading...</div>}>
+        <ResetPassword onNavigate={setCurrentPage} />
+      </React.Suspense>
+    );
   }
 
   return (

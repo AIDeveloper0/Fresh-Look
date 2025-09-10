@@ -50,6 +50,23 @@ const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
     }
   };
 
+  const openFreeQuiz = () => {
+    // Navigate back to home and scroll to the quiz section
+    if (onNavigate) {
+      onNavigate('home');
+    }
+    // Defer to allow Home to render before scrolling
+    setTimeout(() => {
+      try {
+        window.location.hash = '#quiz';
+        const el = document.getElementById('quiz');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch {
+        // no-op if document not available
+      }
+    }, 0);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -115,7 +132,10 @@ const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                   ))}
                 </ul>
                 
-                <button className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors ${plan.buttonStyle}`}>
+                <button
+                  onClick={plan.name === 'Free' ? openFreeQuiz : undefined}
+                  className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors ${plan.buttonStyle}`}
+                >
                   {plan.buttonText}
                 </button>
               </div>

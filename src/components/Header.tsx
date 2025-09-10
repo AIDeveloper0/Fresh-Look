@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Menu, X, Home, TrendingUp, Users, Mail } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface HeaderProps {
   onNavigate?: (page: string) => void;
@@ -8,6 +9,26 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onNavigate, onMemberAccess }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      setUserEmail(data.session?.user?.email ?? null);
+    };
+    init();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user?.email ?? null);
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    onNavigate && onNavigate('home');
+  };
 
   const handleLogoClick = () => {
     if (onNavigate) {
@@ -64,15 +85,29 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, onMemberAccess }) => {
           </nav>
           
           <div className="hidden md:flex items-center space-x-4">
-            <button 
-              onClick={() => onNavigate && onNavigate('signin')}
-              className="text-gray-600 hover:text-amber-600 transition-colors"
-            >
-              Sign In
-            </button>
-            <button className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors">
-              Start Free Trial
-            </button>
+            {userEmail ? (
+              <>
+                <span className="text-sm text-gray-600">Signed in as {userEmail}</span>
+                <button 
+                  onClick={handleSignOut}
+                  className="text-gray-600 hover:text-amber-600 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  onClick={() => onNavigate && onNavigate('signin')}
+                  className="text-gray-600 hover:text-amber-600 transition-colors"
+                >
+                  Sign In
+                </button>
+                <button className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors">
+                  Start Free Trial
+                </button>
+              </>
+            )}
           </div>
           
           <div className="md:hidden">
@@ -119,9 +154,23 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, onMemberAccess }) => {
                 Legal
               </button>
               <div className="pt-2">
-                <button className="w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors">
-                  Start Free Trial
-                </button>
+                {userEmail ? (
+                  <button 
+                    onClick={handleSignOut}
+                    className="w-full text-left px-3 py-2 text-gray-600 hover:text-amber-600"
+                  >
+                    Sign Out ({userEmail})
+                  </button>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => onNavigate && onNavigate('signin')}
+                      className="w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
+                    >
+                      Sign In
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

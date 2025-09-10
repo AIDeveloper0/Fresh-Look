@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Phone, ArrowRight, Home, Chrome, ArrowLeft } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface SignUpProps {
   onNavigate?: (page: string) => void;
+  onMemberAccess?: (type: 'premium') => void;
 }
 
-const SignUp: React.FC<SignUpProps> = ({ onNavigate }) => {
+const SignUp: React.FC<SignUpProps> = ({ onNavigate, onMemberAccess }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -13,6 +15,9 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate }) => {
     phone: '',
     password: ''
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -22,22 +27,57 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate }) => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission here
-    console.log('Sign up form submitted:', formData);
-    // For demo purposes, navigate to dashboard
-    if (onNavigate) {
-      onNavigate('dashboard');
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone: formData.phone,
+          },
+          emailRedirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+
+      if (data.session) {
+        // Email confirmations disabled -> immediate session
+        onMemberAccess?.('premium');
+        onNavigate?.('dashboard');
+      } else {
+        // Default: email confirmation required
+        setInfo('Check your email to confirm your account.');
+      }
+    } catch (err: any) {
+      setError(err?.message ?? 'Sign up failed');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleGoogleSignUp = () => {
-    // Handle Google sign up here
-    console.log('Google sign up clicked');
-    // For demo purposes, navigate to dashboard
-    if (onNavigate) {
-      onNavigate('dashboard');
+  const handleGoogleSignUp = async () => {
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err?.message ?? 'Google sign-up failed');
+    } finally {
+      setLoading(false);
     }
   };
   const handleBackToHome = () => {
@@ -184,11 +224,22 @@ const SignUp: React.FC<SignUpProps> = ({ onNavigate }) => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-amber-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-amber-700 transition-colors shadow-lg"
+              disabled={loading}
+              className="w-full bg-amber-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-amber-700 transition-colors shadow-lg disabled:opacity-60"
             >
-              Create Account
+              {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
+          {error && (
+            <div className="mt-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+          {info && (
+            <div className="mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded">
+              {info}
+            </div>
+          )}
 
           {/* Google Sign Up */}
           <div className="mt-6">

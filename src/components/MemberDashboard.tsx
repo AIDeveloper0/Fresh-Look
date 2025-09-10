@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Home, TrendingUp, Calendar, MessageSquare, User, Settings, Bell, Award, BookOpen, Video, Star, Mail, ArrowLeft } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Home, TrendingUp, Calendar, MessageSquare, User, Settings, Bell, Award, BookOpen, Video, Star, Mail, ArrowLeft, LogOut } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface MemberDashboardProps {
   membershipType: 'premium';
@@ -8,6 +9,26 @@ interface MemberDashboardProps {
 
 const MemberDashboard: React.FC<MemberDashboardProps> = ({ membershipType, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      setUserEmail(data.session?.user?.email ?? null);
+    };
+    init();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user?.email ?? null);
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    onNavigate?.('home');
+  };
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Home className="h-5 w-5" /> },
@@ -89,11 +110,22 @@ const MemberDashboard: React.FC<MemberDashboardProps> = ({ membershipType, onNav
               <span>Back to Home</span>
             </button>
             <div className="flex items-center space-x-4">
+              {userEmail && (
+                <span className="hidden sm:inline text-sm text-gray-600">{userEmail}</span>
+              )}
               <Bell className="h-5 w-5 text-gray-600 cursor-pointer hover:text-amber-600" />
               <Settings className="h-5 w-5 text-gray-600 cursor-pointer hover:text-amber-600" />
               <div className="w-8 h-8 bg-amber-600 rounded-full flex items-center justify-center">
                 <span className="text-white text-sm font-semibold">JC</span>
               </div>
+              <button 
+                onClick={handleSignOut}
+                className="flex items-center space-x-1 text-gray-600 hover:text-amber-600"
+                title="Sign Out"
+              >
+                <LogOut className="h-5 w-5" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </button>
             </div>
           </div>
         </div>
