@@ -1,5 +1,5 @@
 import React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Mission from './components/Mission';
@@ -21,11 +21,23 @@ import { supabase } from './lib/supabaseClient';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
-  const [membershipType, setMembershipType] = useState<'premium'>('premium');
+  const [session, setSession] = useState<import('@supabase/supabase-js').Session | null>(null);
+  const isSignedIn = !!session;
+  const isPremium = useMemo(() => {
+    const meta: any = session?.user?.app_metadata || {};
+    return meta?.is_premium === true;
+  }, [session]);
 
-  // Demo function to simulate login/membership access
-  const handleMemberAccess = (type: 'premium') => {
-    setMembershipType(type);
+  // Navigate intent to premium content from header/buttons
+  const handleMemberAccess = (_type: 'premium') => {
+    if (!isSignedIn) {
+      setCurrentPage('signin');
+      return;
+    }
+    if (!isPremium) {
+      setCurrentPage('pricing');
+      return;
+    }
     setCurrentPage('dashboard');
   };
 
@@ -43,13 +55,23 @@ function App() {
     const recovering = isRecoveryFromUrl();
     const init = async () => {
       const { data } = await supabase.auth.getSession();
+      const search = typeof window !== 'undefined' ? window.location.search : '';
+      // If returning from Stripe success, refresh to pick up app_metadata changes
+      if (/status=success/.test(search)) {
+        try {
+          await supabase.auth.refreshSession();
+        } catch {}
+      }
+      const { data: after } = await supabase.auth.getSession();
       if (recovering) {
         setCurrentPage('reset-password');
+        setSession(after.session ?? null);
         return;
       }
-      if (data.session) {
-        setMembershipType('premium');
-        setCurrentPage('dashboard');
+      if (after.session) {
+        setSession(after.session);
+      } else if (data.session) {
+        setSession(data.session);
       }
     };
     init();
@@ -60,10 +82,8 @@ function App() {
         setCurrentPage('reset-password');
         return;
       }
-      if (session) {
-        setMembershipType('premium');
-        setCurrentPage('dashboard');
-      } else {
+      setSession(session ?? null);
+      if (!session) {
         // Avoid overriding explicit navigation (e.g., reset-password)
         setCurrentPage(prev => (prev === 'dashboard' ? 'home' : prev));
       }
@@ -93,19 +113,53 @@ function App() {
     setCurrentPage(page);
   };
 
+  const AccessDenied: React.FC<{ reason: 'signin' | 'upgrade'; target: string }> = ({ reason, target }) => (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
+      <div className="max-w-md w-full bg-white border rounded-xl shadow p-6 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h1>
+        <p className="text-gray-600 mb-6">
+          {reason === 'signin'
+            ? `Please sign in to access ${target}.`
+            : `Upgrade to Premium to access ${target}.`}
+        </p>
+        <div className="flex gap-3 justify-center">
+          {reason === 'signin' ? (
+            <>
+              <button onClick={() => setCurrentPage('signin')} className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700">Sign In</button>
+              <button onClick={() => setCurrentPage('pricing')} className="px-4 py-2 rounded-lg border border-amber-600 text-amber-700 hover:bg-amber-50">View Pricing</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setCurrentPage('pricing')} className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700">Go Premium</button>
+              <button onClick={() => setCurrentPage('home')} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Back Home</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   if (currentPage === 'dashboard') {
-    return <MemberDashboard membershipType={membershipType} onNavigate={handleDashboardNavigation} />;
+    if (!isSignedIn) return <AccessDenied reason="signin" target="the Premium Dashboard" />;
+    if (!isPremium) return <AccessDenied reason="upgrade" target="the Premium Dashboard" />;
+    return <MemberDashboard membershipType={'premium'} onNavigate={handleDashboardNavigation} />;
   }
 
   if (currentPage === 'trends') {
+    if (!isSignedIn) return <AccessDenied reason="signin" target="Trend Center" />;
+    if (!isPremium) return <AccessDenied reason="upgrade" target="Trend Center" />;
     return <TrendCenter />;
   }
 
   if (currentPage === 'tools') {
+    if (!isSignedIn) return <AccessDenied reason="signin" target="Style Tools" />;
+    if (!isPremium) return <AccessDenied reason="upgrade" target="Style Tools" />;
     return <StyleTools />;
   }
 
   if (currentPage === 'newsletter') {
+    if (!isSignedIn) return <AccessDenied reason="signin" target="Newsletter" />;
+    if (!isPremium) return <AccessDenied reason="upgrade" target="Newsletter" />;
     return <NewsletterPage onNavigate={setCurrentPage} />;
   }
 
