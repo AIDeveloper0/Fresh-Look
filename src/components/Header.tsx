@@ -38,8 +38,8 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, onMemberAccess }) => {
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center h-16">
           <button 
             onClick={handleLogoClick}
             className="flex items-center hover:opacity-80 transition-opacity"
@@ -48,7 +48,7 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, onMemberAccess }) => {
             <span className="ml-2 text-2xl font-bold text-gray-900">FreshLook</span>
           </button>
           
-          <nav className="hidden md:flex space-x-8">
+          <nav className="hidden md:flex items-center gap-8 xl:gap-12 flex-1 justify-center whitespace-nowrap">
             <a href="#mission" className="text-gray-600 hover:text-amber-600 transition-colors">Our Mission</a>
             <a href="#features" className="text-gray-600 hover:text-amber-600 transition-colors">Features</a>
             <a href="#quiz" className="text-gray-600 hover:text-amber-600 transition-colors">Take Quiz</a>
@@ -84,10 +84,11 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, onMemberAccess }) => {
             </button>
           </nav>
           
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-4 whitespace-nowrap">
             {userEmail ? (
               <>
-                <span className="text-sm text-gray-600">Signed in as {userEmail}</span>
+                <span className="hidden lg:inline text-sm text-gray-600">Signed in as</span>
+                <span className="text-sm text-gray-600 max-w-[260px] truncate inline-block align-bottom">{userEmail}</span>
                 <button 
                   onClick={handleSignOut}
                   className="text-gray-600 hover:text-amber-600 transition-colors"
